@@ -20,6 +20,7 @@
 | **Public site** | `https://dripbar.site` → Vercel |
 | **WordPress** | `https://cms.dripbar.site` → LiteSpeed shared host `103.159.36.86` |
 | **GraphQL** | `https://cms.dripbar.site/graphql` |
+| **Repo** | `https://github.com/Sajidurs/headless_core` · branch `main` · pushed 2026-08-20 |
 | **cPanel user** | `myaimgenius` |
 | **Document root** | `/home/myaimgenius/dripbar.site` — **not** `public_html` (verified from cPanel 2026-08-20) |
 | **wp-config.php** | `/home/myaimgenius/dripbar.site/wp-config.php` |
@@ -77,7 +78,7 @@ Kit extraction is **Phase 17**: mark the repo as a GitHub template, freeze ACF f
 | # | Phase | Owner | Status | Notes |
 |---|---|---|---|---|
 | 00 | Recon — verify install state | Claude | ✅ | See §1 |
-| 01 | Repo + folder structure + `CLAUDE.md` | Claude | ✅ | Committed `bd68cb5` |
+| 01 | Repo + folder structure + `CLAUDE.md` | Claude | ✅ | Pushed to GitHub `main`, 7 commits, 39 files. History audited for secrets — clean. |
 | 02 | Move WP to `cms.` subdomain | **You** | ⏳ | Host panel + DNS. **Do before any content.** |
 | 03 | `wp-config.php` headless block | **You** | ⏳ | `wp/wp-config-snippet.php` ready to paste |
 | 04 | Install plugin set | **You** | 🚫 | Blocked on B-01 (ACF Pro licence) |
@@ -160,6 +161,7 @@ Page set for a cleaning service company. Adjust once the client brief lands.
 | **B-04** | **SSH / WP-CLI on the host?** Not required, but without it every plugin install is a manual zip upload and `setup.sh` cannot run. Check for "Terminal" or "SSH Access" in the host panel. | Medium | Phase 17 | **You** | 🚫 Open |
 | **B-05** | **WordPress 7.1 plugin compatibility unverified.** Cannot confirm from memory that WPGraphQL / WPGraphQL-for-ACF support WP 7.1. Check each plugin page for the "Tested up to" value before relying on it. | Medium | Phase 04 | **You** | 🚫 Open |
 | **B-06** | **Resend sending domain.** Contact form needs a verified domain in Resend, which means adding DKIM/SPF DNS records. | Low | Phase 13 | **You** | 🚫 Open |
+| **B-07** | **Repo visibility unconfirmed.** No secrets leaked either way — history was audited before the first push. But `headless_core` will hold the commercial kit and, from Phase 09, client content models in `wp/acf-json/`. Set it private while that is still cheap: GitHub → Settings → Danger Zone → Change visibility. Also tick *Template repository* at Phase 17. | Low | Phase 17 | **You** | 🚫 Open |
 
 ---
 
@@ -202,7 +204,12 @@ Read `changeslog.md` §5 before changing any of these — they look like mistake
 
 ## 9. Secrets inventory
 
-Never commit these. `.env.local` is gitignored; Vercel holds the production copies.
+Never commit these. `web/.env.local` and `wp/wp-config-snippet.php` are gitignored; Vercel holds
+the production copies. `web/.env.local.example` **is** committed and holds placeholders only —
+keep it in step with this table whenever a variable is added.
+
+> Verified 2026-08-20: no secret filename or value exists anywhere in git history, local or on
+> `origin/main`. Re-run that audit before any future first push to a new remote.
 
 | Name | Where it lives | Status |
 |---|---|---|

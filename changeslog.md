@@ -268,6 +268,71 @@ A checklist of traps specific to this stack. Most cost an afternoon each.
 
 *Newest first. Each entry is self-contained.*
 
+### Session 02 — 2026-08-20 · repo published
+
+*Continuation of Session 01 on the same working day — no context was lost between them.*
+
+**Asked.** Push the code to `https://github.com/Sajidurs/headless_core.git`. The user pasted
+GitHub's blank-repository boilerplate (`git init` / `git add README.md` / `git commit` /
+`git branch -M main` / `git remote add` / `git push`).
+
+**Did not run that snippet as-is.** It is written for an empty directory. `git init` on an
+existing repo plus a README-only commit would have stacked a redundant commit on top of the six
+we already had. Wired the existing history to the remote instead, preserving all commits.
+
+**Built / changed.**
+- `README.md` (root) — repo front door. Points at `changeslog.md` as the cold-start read, and
+  documents layout, stack, and the four-sentence architecture summary. Written as the kit
+  template's front page, not a one-line stub.
+- `web/.env.local.example` — committed template with **placeholders only**, so a new client build
+  knows what to fill in.
+- `web/.gitignore` — added `!.env.local.example`.
+- Branch renamed `master` → `main`.
+- Remote `origin` added; pushed with `-u`.
+
+**Verified.**
+- **Security audit before pushing**, across *all* of git history rather than just the working
+  tree — a secret committed once persists in history even after deletion. Two checks: (a) no
+  sensitive filenames in any commit (`git log --all --name-only`), (b) the literal secret values
+  appear in no blob (`git grep` across `git rev-list --all`). Both clean.
+- Re-audited `origin/main` after the push: no `.env`, no `wp-config-snippet.php`, no key files.
+- 7 commits and 39 files on the remote; `git status -sb` shows local and remote in sync.
+- Only `web/.env.local.example` is tracked among env files; `web/.env.local` and
+  `wp/wp-config-snippet.php` confirmed still ignored via `git check-ignore -v`.
+
+**Decisions and reasoning.**
+
+| Decision | Why |
+|---|---|
+| Preserve existing history rather than following GitHub's boilerplate | Seven meaningful commits with real reasoning in their messages. A fresh `git init` would have discarded or duplicated that. |
+| Commit an `.env.local.example` with placeholders | The real `.env.local` is gitignored, so without a committed template a new client build has no record of which variables exist. Standard practice, and it matters more here because this repo is the kit. |
+| Audit full history, not just the working tree, before the first push | Secrets are real and the repo's visibility was unknown. Once pushed, a leaked secret must be treated as compromised regardless of later deletion — the check has to happen *before*, and it has to cover history. |
+
+**Discovered / corrected.**
+- `web/.env.local.example` silently failed to stage. Cause: `create-next-app` writes a blanket
+  `.env*` into `web/.gitignore` (line 34), which catches it. Diagnosed with
+  `git check-ignore -v`. Fixed with an explicit negation. **Worth remembering — this will recur
+  on every new client scaffold** until the fix is part of the template.
+- No secrets ever entered git history, so no history rewrite was needed. Confirmed, not assumed.
+
+**Commits.**
+
+| SHA | What |
+|---|---|
+| `6768473` | docs: add root README and committed env template |
+
+**Blocked on.** Unchanged from Session 01 — the user creating `cms.dripbar.site`, and **B-01**
+(ACF Pro licence).
+
+**New open item.** Repository visibility was never confirmed. Nothing leaked either way, but the
+repo will hold the commercial kit and, from Phase 09, client content models in `wp/acf-json/`.
+Tracked as **B-07** in `SYSTEM.md`.
+
+**Immediate next action.** Unchanged: ask what `https://cms.dripbar.site/wp-admin` shows, and get
+an answer on B-01.
+
+---
+
 ### Session 01 — 2026-08-20
 
 **Asked.** Three things, in order: (a) a complete guide to headless WordPress with blockers and
