@@ -41,21 +41,21 @@ Then update the phase and blocker tables in `SYSTEM.md` to match.
 1. **Work continues past the log entry.** The entry gets written mid-session, then more work
    happens and never gets recorded. Write the entry *last*, and if in doubt just ask
    *"is the changeslog current?"* before closing the project.
-2. **The log entry cannot cite its own commit.** The commit that writes a session entry has no
-   SHA yet when the entry is drafted. Either `git commit --amend` the SHA in afterwards, or list
-   it at the top of the next session's commit table. Do not leave it unlisted — the audit below
-   is what catches drift.
+2. **A log entry can never cite its own commit.** The commit that writes an entry has no SHA
+   until it exists, and amending to insert the SHA changes the SHA again — it is unfixable, not
+   merely awkward. So the steady state is a **one-commit trailing gap**, and that is fine. Cite
+   the previous doc-sync commit at the top of the next entry's table.
 
 **Self-audit — run this to check the log is complete:**
 
 ```bash
-# every commit in the repo
-git log --oneline --reverse
-# every commit cited in this file
-grep -oE '`[0-9a-f]{7}`' changeslog.md | tr -d '`' | sort -u
+git log --oneline --reverse | awk '{print $1}'            # every commit in the repo
+grep -oE '`[0-9a-f]{7}`' changeslog.md | tr -d '`' | sort  # every commit cited here
 ```
 
-Every SHA in the first list should appear in the second. Any that does not is unlogged work.
+Every SHA in the first list must appear in the second, **except** the single most recent commit
+when that commit is the one that wrote the current entry. Any other gap is unlogged work — find
+it with `git show <sha> --stat` and add an entry.
 
 ---
 
@@ -341,7 +341,8 @@ we already had. Wired the existing history to the remote instead, preserving all
 | SHA | What |
 |---|---|
 | `6768473` | docs: add root README and committed env template |
-| `0b138b9` | docs: log session 02 and sync SYSTEM.md — *the commit that wrote this entry* |
+| `0b138b9` | docs: log session 02 and sync SYSTEM.md |
+| `0e87ed9` | docs: close changeslog coverage gap and add a self-audit |
 
 **Blocked on.** Unchanged from Session 01 — the user creating `cms.dripbar.site`, and **B-01**
 (ACF Pro licence).
