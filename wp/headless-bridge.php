@@ -25,6 +25,47 @@ if ( ! defined( 'HEADLESS_URL' ) ) {
 	return;
 }
 
+/**
+ * The public site's hostname, e.g. "dripbar.site".
+ */
+function hb_frontend_host() {
+	return wp_parse_url( HEADLESS_URL, PHP_URL_HOST );
+}
+
+/**
+ * Has DNS been cut over to Vercel yet?
+ *
+ * Until it has, dripbar.site still resolves to this same WordPress install.
+ * That matters a lot for the redirect in section 1: sending a visitor from
+ * dripbar.site to HEADLESS_URL would land them back here, and loop forever.
+ *
+ * So: if the request arrived on the public hostname, DNS has NOT cut over and
+ * we must not redirect. Once Vercel owns the apex, requests only ever arrive
+ * here on cms.dripbar.site and the redirect becomes safe automatically.
+ *
+ * This is what makes the plugin safe to upload at any point in the process
+ * rather than only after the DNS change.
+ */
+function hb_dns_has_cut_over() {
+	$incoming = isset( $_SERVER['HTTP_HOST'] ) ? strtolower( $_SERVER['HTTP_HOST'] ) : '';
+
+	return $incoming !== strtolower( (string) hb_frontend_host() );
+}
+
+/**
+ * Permit redirects to the frontend host.
+ *
+ * wp_safe_redirect() runs the target through wp_validate_redirect(), which only
+ * allows the site's own host and silently rewrites anything else to
+ * /wp-admin/. Since the frontend is a DIFFERENT host, without this filter every
+ * visitor to the CMS would be dumped at the login screen instead of the website.
+ */
+add_filter( 'allowed_redirect_hosts', function ( $hosts ) {
+	$hosts[] = hb_frontend_host();
+
+	return array_unique( array_filter( $hosts ) );
+} );
+
 /* ===========================================================================
  * 1. NOBODY SHOULD LAND ON THE WORDPRESS FRONTEND
  *
@@ -57,9 +98,17 @@ add_action( 'template_redirect', function () {
 		return;
 	}
 
+	// Loop guard. Before DNS cuts over to Vercel, the public hostname still
+	// points here — redirecting would send the visitor straight back.
+	if ( ! hb_dns_has_cut_over() ) {
+		return;
+	}
+
 	$path = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '/';
 
-	wp_safe_redirect( HEADLESS_URL . $path, 301 );
+	// 302 while building, so nothing gets permanently cached in a visitor's
+	// browser or an ISP proxy. Switch to 301 at launch (Phase 16).
+	wp_safe_redirect( HEADLESS_URL . $path, 302 );
 	exit;
 } );
 
