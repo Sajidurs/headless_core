@@ -76,23 +76,37 @@ write `setup.sh`. Project 02 then clones and we refactor whatever did not fit. B
 | # | Phase | Owner | Status | Notes |
 |---|---|---|---|---|
 | 00 | Recon — verify install state | Claude | ✅ | See §1 |
-| 01 | Repo + folder structure | Claude | 🔄 | |
-| 02 | Move WP to `cms.` subdomain | **You** | ⏳ | Host panel + DNS. Do before any content. |
-| 03 | `wp-config.php` headless block | **You** | ⏳ | File written, needs pasting |
+| 01 | Repo + folder structure + `CLAUDE.md` | Claude | ✅ | Committed `bd68cb5` |
+| 02 | Move WP to `cms.` subdomain | **You** | ⏳ | Host panel + DNS. **Do before any content.** |
+| 03 | `wp-config.php` headless block | **You** | ⏳ | `wp/wp-config-snippet.php` ready to paste |
 | 04 | Install plugin set | **You** | 🚫 | Blocked on B-01 (ACF Pro licence) |
-| 05 | Upload bridge plugin | **You** | ⏳ | File written, needs uploading |
-| 06 | Next.js scaffold | Claude | 🔄 | |
-| 07 | GraphQL client + queries | Claude | ⏳ | |
-| 08 | Catch-all route + section registry | Claude | ⏳ | |
+| 05 | Upload bridge plugin | **You** | ⏳ | `wp/headless-bridge.php` ready to upload |
+| 06 | Next.js scaffold | Claude | ✅ | Next 16.3.1, React 19.2, Tailwind 4.3 |
+| 07 | GraphQL client + queries | Claude | ✅ | `lib/wp.ts`, `lib/queries.ts`, `lib/types.ts` |
+| 08 | Catch-all route + section registry | Claude | ✅ | `pnpm build` green |
 | 09 | Design the ACF section library | Claude + You | 🚫 | Blocked on B-01 |
-| 10 | Build section components | Claude | ⏳ | Needs brand brief — B-02 |
-| 11 | Preview + revalidation wiring | Claude | ⏳ | |
-| 12 | SEO — sitemap, robots, schema, redirects | Claude | ⏳ | |
-| 13 | Contact form via Resend | Claude | ⏳ | Needs verified sending domain |
-| 14 | Vercel deploy + DNS cutover | Claude + You | ⏳ | |
+| 10 | Build section components | Claude | 🚫 | Blocked on B-02 (brand brief) |
+| 11 | Preview + revalidation wiring | Claude | ✅ | Code done. **End-to-end test pending Phase 04.** |
+| 12 | SEO — sitemap, robots, schema | Claude | 🔄 | sitemap + robots + security headers done. Yoast fields and JSON-LD pending Phase 04. |
+| 13 | Contact form via Resend | Claude | ⏳ | Needs verified sending domain — B-06 |
+| 14 | Vercel deploy + DNS cutover | Claude + You | ⏳ | Can start as soon as Phase 02 is done |
 | 15 | Content entry — all pages | **You** | ⏳ | |
 | 16 | QA against the launch checklist | Claude + You | ⏳ | Checklist in §7 |
 | 17 | Extract the kit | Claude | ⏳ | Template repo, `setup.sh`, freeze names |
+
+### What exists in the repo right now
+
+| File | Does |
+|---|---|
+| `wp/headless-bridge.php` | Redirects, preview links, revalidation webhook, ACF local JSON, menu locations, `noindex` header |
+| `wp/wp-config-snippet.php` | Pinned URLs, shared secrets, hardening. **Gitignored — holds real secrets.** |
+| `web/src/lib/wp.ts` | `wpQuery()` with cache tags + authenticated preview; `toUri()`; `uriTag()` |
+| `web/src/lib/queries.ts` | `NODE_BY_URI`, `ALL_URIS`, `SITE_SETTINGS`, `SITEMAP` — core fields only, no ACF yet |
+| `web/src/app/[[...slug]]/page.tsx` | The one route. `nodeByUri` → `__typename` switch → template |
+| `web/src/components/sections.tsx` | Section registry. Empty until Phase 10; warns loudly in dev on unmapped sections |
+| `web/src/app/api/revalidate/route.ts` | Webhook target + `GET` health check |
+| `web/src/app/api/preview/route.ts` | Draft mode entry, with open-redirect guard |
+| `web/src/app/sitemap.ts` `robots.ts` | Public-hostname sitemap, replacing Yoast's |
 
 ---
 
@@ -179,6 +193,11 @@ Nothing ships until every line is ✅.
 | 2026-08-20 | WP stays on the same host, moves to `cms.` subdomain | It only serves GraphQL and wp-admin now. Shared LiteSpeed hosting is genuinely sufficient. |
 | 2026-08-20 | Forms bypass WordPress — Next route handler + Resend | No PHP mail deliverability problems, no plugin, no spam surface. |
 | 2026-08-20 | Sitemap and robots generated in Next.js, not Yoast | Yoast's sitemap emits `cms.` URLs, which would split search authority. |
+| 2026-08-20 | Phase-1 queries use core WordPress fields only, no ACF or Yoast | Lets us prove the whole pipeline end-to-end before either paid plugin is in place. ACF fragments and Yoast SEO fields get layered in at Phases 09 and 12. |
+| 2026-08-20 | Menu locations registered in the bridge plugin, not a theme | twentytwentyfive is a block theme and registers no classic menu locations, so the `PRIMARY` enum would not exist in the GraphQL schema. Registering in the mu-plugin also survives a theme switch. |
+| 2026-08-20 | `revalidateTag(tag, "max")` — two arguments | **Verified against installed Next 16.3.1 types.** Next 16 made the cacheLife profile argument required; the one-argument Next 15 form does not compile. Most tutorials online still show the old form. |
+| 2026-08-20 | `eslint` key removed from `next.config.ts` | Next 16 dropped it — linting is no longer part of `next build`. Run `pnpm lint` separately. |
+| 2026-08-20 | Image `qualities` capped at `[70, 85]`, device sizes trimmed | Each extra quality/size multiplies the optimised variants Vercel bills for. Controls playbook blocker B-07 with no visible quality difference. |
 
 ---
 
