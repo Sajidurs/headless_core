@@ -36,6 +36,27 @@ the template at the end of this file. Record:
 
 Then update the phase and blocker tables in `SYSTEM.md` to match.
 
+**Two failure modes this protocol has already hit — guard against both:**
+
+1. **Work continues past the log entry.** The entry gets written mid-session, then more work
+   happens and never gets recorded. Write the entry *last*, and if in doubt just ask
+   *"is the changeslog current?"* before closing the project.
+2. **The log entry cannot cite its own commit.** The commit that writes a session entry has no
+   SHA yet when the entry is drafted. Either `git commit --amend` the SHA in afterwards, or list
+   it at the top of the next session's commit table. Do not leave it unlisted — the audit below
+   is what catches drift.
+
+**Self-audit — run this to check the log is complete:**
+
+```bash
+# every commit in the repo
+git log --oneline --reverse
+# every commit cited in this file
+grep -oE '`[0-9a-f]{7}`' changeslog.md | tr -d '`' | sort -u
+```
+
+Every SHA in the first list should appear in the second. Any that does not is unlogged work.
+
 ---
 
 ## 1. Who the user is and what they actually want
@@ -320,6 +341,7 @@ we already had. Wired the existing history to the remote instead, preserving all
 | SHA | What |
 |---|---|
 | `6768473` | docs: add root README and committed env template |
+| `0b138b9` | docs: log session 02 and sync SYSTEM.md — *the commit that wrote this entry* |
 
 **Blocked on.** Unchanged from Session 01 — the user creating `cms.dripbar.site`, and **B-01**
 (ACF Pro licence).
@@ -441,6 +463,7 @@ the 3–4 hour design pass in the runbook; it is not optional.
 | `26a6279` | fix(wp): redirect loop guard and allowed_redirect_hosts filter |
 | `a599656` | fix(wp): gate visitor redirect behind explicit HEADLESS_LIVE switch |
 | `cd693ac` | docs: record verified cPanel paths and subdomain decision |
+| `08e854d` | docs: add changeslog.md as the cold-start context file |
 
 **Ended blocked on the user.** Creating the `cms.dripbar.site` subdomain in cPanel — Domains →
 Create A New Domain → `cms.dripbar.site` → tick *Share document root
