@@ -1,8 +1,11 @@
 # SYSTEM.md — Project 01: Cleaning Service Site
 
-> **Living document.** Update the status columns as we go. This is the single source of truth for
-> where the project stands, what is blocked, and what decisions were made and why.
-> Claude Code reads this at the start of every session.
+> **Live status board.** This file answers one question: *where does the project stand right now?*
+> Update the status columns and blocker rows in place as things change.
+>
+> For **history, context, and the reasoning behind every decision**, read `changeslog.md` — that
+> is the file to hand a new assistant that is picking the project up cold. Keep the boundary
+> clean: status here, story there. Do not duplicate.
 
 ---
 
@@ -52,27 +55,20 @@
 
 ---
 
-## 3. Strategy decision — client-first, kit-shaped
+## 3. The one rule that governs every file
 
-**Decided 2026-08-20.** We do **not** build the kit in the abstract first. We build this real
-cleaning-service site, but build it *kit-shaped*, then extract the kit from it at the end.
+**Client-first, kit-shaped.** This real site *becomes* the reusable kit; it is not built in the
+abstract first. Full reasoning in `changeslog.md` §2 — read it before questioning the approach.
 
-**Why:** a section library designed with no real site to validate it produces roughly twelve sections,
-of which four are wrong and three are missing. A real project forces real decisions. It also means the
-three-to-four weeks of kit work is paid work, not speculative work.
+The operational rule, which applies to every commit:
 
-**The condition that makes this work.** From day one, nothing client-specific may live anywhere except
-these two places:
+> Nothing client-specific may live anywhere except **`web/src/app/globals.css`** (brand tokens)
+> and the **ACF Options page** in wp-admin (logo, phone, address, socials, footer copy).
+>
+> If a component hardcodes the word "cleaning", it is built wrong.
 
-1. `web/src/app/globals.css` — brand tokens (colour, type, radius)
-2. The ACF Options page in wp-admin — logo, phone, address, socials, footer copy
-
-Everything else must be generic enough for the next client. If a component needs the word "cleaning"
-hardcoded, it is built wrong. This discipline costs about 10% extra effort on this project and saves
-the entire kit-build phase.
-
-**Extraction happens in Phase 12.** Mark the repo as a GitHub template, freeze ACF field names,
-write `setup.sh`. Project 02 then clones and we refactor whatever did not fit. By project 03 it is stable.
+Kit extraction is **Phase 17**: mark the repo as a GitHub template, freeze ACF field names, write
+`setup.sh`. Project 02 clones it and we refactor whatever did not fit.
 
 ---
 
@@ -190,21 +186,17 @@ Nothing ships until every line is ✅.
 
 ---
 
-## 8. Decision log
+## 8. Decision log — moved
 
-| Date | Decision | Reasoning |
-|---|---|---|
-| 2026-08-20 | Client-first, kit-shaped — not kit-first | See §3. Paid work beats speculative work, and real sites produce correct abstractions. |
-| 2026-08-20 | WP stays on the same host, moves to `cms.` subdomain | It only serves GraphQL and wp-admin now. Shared LiteSpeed hosting is genuinely sufficient. |
-| 2026-08-20 | Forms bypass WordPress — Next route handler + Resend | No PHP mail deliverability problems, no plugin, no spam surface. |
-| 2026-08-20 | Sitemap and robots generated in Next.js, not Yoast | Yoast's sitemap emits `cms.` URLs, which would split search authority. |
-| 2026-08-20 | Phase-1 queries use core WordPress fields only, no ACF or Yoast | Lets us prove the whole pipeline end-to-end before either paid plugin is in place. ACF fragments and Yoast SEO fields get layered in at Phases 09 and 12. |
-| 2026-08-20 | Menu locations registered in the bridge plugin, not a theme | twentytwentyfive is a block theme and registers no classic menu locations, so the `PRIMARY` enum would not exist in the GraphQL schema. Registering in the mu-plugin also survives a theme switch. |
-| 2026-08-20 | `revalidateTag(tag, "max")` — two arguments | **Verified against installed Next 16.3.1 types.** Next 16 made the cacheLife profile argument required; the one-argument Next 15 form does not compile. Most tutorials online still show the old form. |
-| 2026-08-20 | `eslint` key removed from `next.config.ts` | Next 16 dropped it — linting is no longer part of `next build`. Run `pnpm lint` separately. |
-| 2026-08-20 | Image `qualities` capped at `[70, 85]`, device sizes trimmed | Each extra quality/size multiplies the optimised variants Vercel bills for. Controls playbook blocker B-07 with no visible quality difference. |
-| 2026-08-20 | Visitor redirect gated behind an explicit `HEADLESS_LIVE` constant, off by default | Hostname detection could not prevent the loop that forms with WordPress's own `redirect_canonical` before DNS cutover — each hop looks legitimate in isolation, and PHP cannot tell where a domain currently resolves. Flip it on at Phase 14. |
-| 2026-08-20 | `cms.dripbar.site` shares the document root of `dripbar.site` | One WordPress install, one database, two hostnames. A second install would split content from the frontend reading it. |
+Every decision and its reasoning now lives in **`changeslog.md`**, recorded per session, so the
+rationale sits next to the work that produced it.
+
+Read `changeslog.md` §5 before changing any of these — they look like mistakes but are not:
+
+- `revalidateTag(tag, "max")` takes two arguments on Next 16
+- no `eslint` key in `next.config.ts`
+- `HEADLESS_LIVE` gates the visitor redirect and stays off until Phase 14
+- `allowed_redirect_hosts` is required for `wp_safe_redirect` to work cross-host
 
 ---
 

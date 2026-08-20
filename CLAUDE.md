@@ -1,7 +1,17 @@
 # Headless WordPress — Project 01 (cleaning service)
 
-**Read `SYSTEM.md` first.** It holds the phase tracker, live blockers, and decision log.
-Update it whenever a phase changes status. It is the source of truth, not this file.
+## Read these two before doing anything
+
+1. **`changeslog.md`** — full project context and history. The business goal, the architecture,
+   every decision and *why*, verified technical findings that contradict online tutorials, and
+   the gotchas that break this stack. Written to bring any assistant fully up to speed from cold.
+   **Append a session entry at the end of every working session** (template is in its §9).
+2. **`SYSTEM.md`** — current state: phase tracker, live blocker table, launch checklist.
+   **Edit rows in place** as status changes.
+
+Ownership boundary, so the two never drift: `changeslog.md` owns **history and reasoning** and is
+append-only. `SYSTEM.md` owns **current status** and is mutable. Decisions and their rationale go
+in `changeslog.md` only.
 
 ## Shape of the repo
 

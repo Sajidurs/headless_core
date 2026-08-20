@@ -1,0 +1,436 @@
+# changeslog.md — full project context and history
+
+> **If you are an AI assistant picking up this project: read this entire file first.**
+> It is written to be self-sufficient. After reading it you should understand the business
+> goal, the architecture, every decision made and why, what is currently blocked, and what
+> to do next — without needing to ask the user to re-explain anything.
+>
+> Then read `SYSTEM.md` for live status, and `CLAUDE.md` for the coding rules.
+
+---
+
+## 0. How these three files relate — do not blur this
+
+| File | Owns | Mutability |
+|---|---|---|
+| **`changeslog.md`** (this file) | History, orientation, decisions **and the reasoning behind them**, session log | **Append-only.** Never rewrite history. Correct a past entry by adding a new one that supersedes it. |
+| **`SYSTEM.md`** | Current state: phase tracker, live blocker table, launch checklist, secrets inventory | Mutable. Edit rows in place as status changes. |
+| **`CLAUDE.md`** | Coding rules and conventions for the repo | Rarely changes. |
+
+**Rule:** live blocker *status* lives in `SYSTEM.md` only. This file records *when a blocker
+appeared, what it means, and how it was resolved*. If you find yourself updating the same fact
+in both files, you are doing it wrong — put status in `SYSTEM.md`, put the story here.
+
+### Update protocol for whoever works next
+
+At the end of any working session, append a new `## Session NN` block at the top of §7 using
+the template at the end of this file. Record:
+
+1. What was asked
+2. What was actually built or changed, with file paths
+3. **Every decision and its reasoning** — this is the most valuable part; a future AI that knows
+   *why* will not undo it
+4. Anything discovered that contradicts earlier assumptions
+5. What is blocked and on whom
+6. The exact next action
+
+Then update the phase and blocker tables in `SYSTEM.md` to match.
+
+---
+
+## 1. Who the user is and what they actually want
+
+**Background.** Long-time WordPress professional, expert with Elementor Pro. Current delivery
+process: install WordPress, install Elementor Pro, hand-design the whole site — **7 to 10 days
+per client.**
+
+**The goal.** Replace that with a headless stack — WordPress as backend, Next.js as frontend —
+so a complete client site ships in **1 to 2 days.** The intended workflow is: the user sets up
+infrastructure and content, then directs an AI coding assistant to design and build all the
+pages, then delivers to the client. Speed and repeatability are the point.
+
+**What this means for how you should work.** The user is technically strong on WordPress and
+weaker on React/Next.js — explain frontend reasoning, do not explain WordPress basics. They
+want working code plus an explanation of what is happening, not just code. They respond well to
+being told when something they asked for is a bad idea, with the reasoning.
+
+**Business framing agreed in Session 01.** Headless is a **premium tier**, not a replacement for
+Elementor. Suitable: brochure, services, lead-gen, content/SEO-driven sites, budgets above
+roughly $2,500. Keep Elementor for: e-commerce (WooCommerce), membership/LMS, clients who insist
+on moving things themselves, anything under roughly $1,500, or needed this week.
+
+**Reference document.** A full playbook was produced in Session 01 and published as an artifact:
+`https://claude.ai/code/artifact/5addd3ca-b9a9-42e3-89cd-3ceb3dc34a88`
+(private to the user; covers stack rationale, 11 build phases, per-client runbook, 12 blockers,
+trade-offs, cost model). This changeslog supersedes it wherever the two disagree, because the
+playbook was written before the real environment was inspected.
+
+---
+
+## 2. The strategic decision that shapes everything
+
+**Client-first, kit-shaped. Decided Session 01.**
+
+The playbook originally said: spend 3–4 weeks building a reusable kit, *then* start taking
+headless clients. That was revised. The actual plan:
+
+> Build this one real client site, but build it so that it *becomes* the kit. Extract the
+> reusable template from it at the end (Phase 17).
+
+**Reasoning — do not undo this without reading it.** A section library designed in the abstract,
+with no real site to validate it, produces roughly twelve sections of which four are wrong and
+three are missing. A real project forces correct abstractions. It also converts 3–4 weeks of
+unpaid speculative work into paid client work.
+
+**The condition that makes it work — this is a hard rule, enforced in `CLAUDE.md`:**
+
+Nothing client-specific may live anywhere except two places:
+
+1. `web/src/app/globals.css` — the brand tokens (`@theme` block)
+2. The ACF Options page in wp-admin — logo, phone, address, socials, footer copy
+
+If a component hardcodes the word "cleaning", it is built wrong. This discipline costs about
+10% extra on this project and saves the entire kit-build phase.
+
+---
+
+## 3. Architecture — the four ideas that matter
+
+Understand these four and the codebase makes sense.
+
+**1. One route renders the whole site.**
+WPGraphQL exposes `nodeByUri`: hand it any path and it returns whatever WordPress thinks lives
+there — page, post, category, custom post type. So `web/src/app/[[...slug]]/page.tsx` (an
+*optional* catch-all — double brackets, so it also matches `/`) handles every URL. It switches
+on `__typename` to pick a template. **You will almost never add another route.** New page types
+become new ACF layouts and new section components.
+
+**2. ACF Flexible Content is the Elementor replacement.**
+One field group on Pages holds a single Flexible Content field named `sections`. Each layout
+inside it is a section type the client can add, reorder, and remove. This is what gives the
+client back a sense of layout control. Building it well is most of the project's value.
+
+**3. ACF Local JSON makes the content model a git asset.**
+Two filters in the bridge plugin redirect ACF's storage from the database to
+`wp-content/mu-plugins/acf-json/`. Copy that folder into the next client's install and the
+entire content model appears in wp-admin ready to use. **This is the single highest-leverage
+thing in the project** — without it, every new client means re-clicking ~200 fields by hand and
+the 1–2 day target is dead.
+
+**4. Cache tags make a static site feel live.**
+`wpQuery()` attaches tags (`"wp"`, and `uri:/about/`) to every cached fetch. WordPress POSTs to
+`/api/revalidate` on save; that route purges the matching tags; the next visitor gets fresh
+HTML. This is why the site can be fully pre-rendered and still update in seconds.
+
+### Data flow, one direction only
+
+```
+WordPress (cms.dripbar.site)
+  → WPGraphQL /graphql
+    → wpQuery() in Server Components   [never in a Client Component]
+      → static HTML on Vercel CDN (dripbar.site)
+
+WordPress save → /api/revalidate → revalidateTag() → page rebuilds
+WordPress Preview button → /api/preview → draft mode cookie → authenticated uncached fetch
+```
+
+---
+
+## 4. Environment — verified, not assumed
+
+Inspected live on 2026-08-20. Do not trust older assumptions in the playbook.
+
+| Item | Value |
+|---|---|
+| WordPress | **7.1**, fresh install, site title still "My Blog" |
+| PHP | 8.1.34 — should be bumped to 8.2/8.3 if the host offers it |
+| Web server | LiteSpeed, cPanel-based shared host, IP `103.159.36.86` |
+| Theme | twentytwentyfive (block theme — this matters, see §6) |
+| Front page | set to *Posts*; needs changing to a static page |
+| Application Passwords | available ✅ (required for draft preview) |
+| cPanel user | `myaimgenius` |
+| **Document root** | **`/home/myaimgenius/dripbar.site`** — NOT `public_html` |
+| `wp-config.php` | `/home/myaimgenius/dripbar.site/wp-config.php` |
+| mu-plugins | `/home/myaimgenius/dripbar.site/wp-content/mu-plugins/` |
+| Cloudflare | account exists, not yet in front of the domain |
+| `/graphql` | 404 — WPGraphQL not installed yet |
+| `cms.dripbar.site` | did not exist as of end of Session 01 |
+
+**Domain plan.** `dripbar.site` → Vercel (public site). `cms.dripbar.site` → WordPress, sharing
+the **same document root** as `dripbar.site`. One install, one database, two hostnames. A second
+WordPress install would split content from the frontend reading it.
+
+**User's existing accounts:** Vercel, GitHub (fresh repo), Resend, Cloudflare. All unconfigured
+for this project so far.
+
+---
+
+## 5. Verified technical findings — these contradict most online tutorials
+
+Each of these was confirmed by reading the installed package types or by reasoning through the
+actual request flow, not from memory. **Do not "fix" the code back to the tutorial version.**
+
+### Next.js 16.3.1 changed the cache API
+
+`revalidateTag` now takes a **required second argument** — a cacheLife profile name or an
+`{ expire }` object:
+
+```ts
+revalidateTag("wp", "max");   // correct on Next 16
+revalidateTag("wp");          // Next 15 form — does NOT compile on 16
+```
+
+Verified in `node_modules/next/dist/server/web/spec-extension/revalidate.d.ts`. Also new there:
+`updateTag(tag)` (Server Actions only, read-your-own-writes) and `refresh()`. Nearly every
+tutorial online still shows the one-argument form.
+
+### Next.js 16 removed the `eslint` key from `next.config.ts`
+
+Linting is no longer part of `next build`. Including the key is a hard type error. Run
+`pnpm lint` separately. `typescript: { ignoreBuildErrors: false }` is still valid.
+
+### `wp_safe_redirect()` cannot redirect cross-host
+
+It validates the target through `wp_validate_redirect()`, which allows only the site's own host
+and **silently rewrites anything else to `/wp-admin/`**. Since the frontend is a different
+hostname, every visitor would have landed on the login screen. Fixed by registering the frontend
+host via the `allowed_redirect_hosts` filter in the bridge plugin.
+
+### The redirect loop that hostname detection cannot catch
+
+This one is subtle and cost real thought. Before DNS cutover:
+
+```
+visitor → cms.dripbar.site/about
+        → bridge plugin redirects to dripbar.site/about
+        → dripbar.site still resolves to this same server, so WordPress serves it
+        → WordPress's own redirect_canonical sees WP_HOME is cms.dripbar.site
+        → 301 back to cms.dripbar.site/about
+        → infinite loop
+```
+
+Checking the incoming `Host` header does **not** prevent this, because each individual hop looks
+legitimate in isolation. PHP also cannot reliably determine where a domain's DNS currently
+points. So the redirect is gated behind an **explicit constant**, off by default:
+
+```php
+// wp-config.php — uncomment ONLY at DNS cutover (Phase 14)
+// define( 'HEADLESS_LIVE', true );
+```
+
+**Consequence during the build:** both `dripbar.site` and `cms.dripbar.site` serve WordPress,
+and the apex 301s to the CMS subdomain. This looks odd but is harmless — nobody is visiting yet.
+
+---
+
+## 6. Gotchas that will break the site if forgotten
+
+A checklist of traps specific to this stack. Most cost an afternoon each.
+
+1. **Block themes register no classic menu locations.** twentytwentyfive uses Navigation blocks,
+   but WPGraphQL exposes menus through classic locations. Without `register_nav_menus()` the
+   `PRIMARY` enum does not exist in the schema and `SITE_SETTINGS` errors. Registered in the
+   bridge plugin (section 5) rather than a theme, so it survives theme switches.
+
+2. **ACF field names are an API contract.** ACF field and layout names become GraphQL type
+   names. Renaming one after go-live breaks the frontend *silently* — the query returns null and
+   the section simply vanishes. Freeze names once content entry begins.
+
+3. **WPGraphQL for ACF v2 requires explicit opt-in per field group.** Tick *Show in GraphQL* and
+   set an explicit *GraphQL Field Name*. Forget it and the fields do not exist in the schema at
+   all, with no error. Most commonly lost half-hour in this stack.
+
+4. **Adding a section is four steps, always all four.** ACF layout → query fragment in
+   `queries.ts` → component → registry entry in `sections.tsx`. Skipping the query fragment is
+   the classic bug: the component is found but renders blank because the data was never
+   requested. Dev mode shows a red dashed warning box for unregistered sections.
+
+5. **`fetch` is not cached by default in Next 15+.** `wpQuery` sets `cache: "force-cache"`
+   deliberately. Removing it makes every visitor wait on PHP.
+
+6. **Never install a caching plugin on the WordPress side.** It will serve stale GraphQL
+   responses and the cause is not obvious.
+
+7. **`params` is a Promise** in Next 16. So are `draftMode()` and `cookies()`. Always `await`.
+
+8. **Tailwind v4 has no `tailwind.config.js`.** Tokens live in an `@theme` block inside
+   `globals.css`; plugins load via `@plugin`.
+
+9. **Yoast's sitemap emits `cms.` URLs.** Submitting it would index the backend and split the
+   client's search authority. The sitemap is generated in `web/src/app/sitemap.ts` instead.
+
+10. **Debug order for a blank/wrong section — always this order:** GraphiQL in wp-admin (is the
+    data there at all?) → `queries.ts` fragment → `sections.tsx` registry → the component.
+
+---
+
+## 7. Session log
+
+*Newest first. Each entry is self-contained.*
+
+### Session 01 — 2026-08-20
+
+**Asked.** Three things, in order: (a) a complete guide to headless WordPress with blockers and
+trade-offs; (b) start the first real project — a cleaning services company — with step-by-step
+guidance, code, and explanations, plus a tracking file; (c) two design questions.
+
+**Environment at start.** Empty folder `c:\Users\bappe\Documents\headless`. Node 24.15, npm
+11.12, pnpm 11.17, git 2.53. No `gh`, `php`, or `wp-cli` locally (WordPress is remote — fine).
+Fresh WordPress at `https://dripbar.site`.
+
+**Built.**
+
+*Backend, `wp/`:*
+- `headless-bridge.php` — the entire backend integration as one must-use plugin. Seven sections:
+  visitor redirect (gated), preview link rewriting, revalidation webhook, ACF Local JSON,
+  classic menu locations, `X-Robots-Tag: noindex`, admin tidying. Must-use means the client
+  cannot deactivate it.
+- `wp-config-snippet.php` — pinned URLs, generated shared secrets, hardening. **Gitignored,
+  contains real secrets.**
+- `acf-json/` — empty, awaiting Phase 09.
+
+*Frontend, `web/` — Next.js 16.3.1, React 19.2.8, Tailwind 4.3.3, TypeScript:*
+- `src/lib/wp.ts` — `wpQuery()` with cache tags and authenticated preview, `toUri()`, `uriTag()`
+- `src/lib/queries.ts` — `NODE_BY_URI`, `ALL_URIS`, `SITE_SETTINGS`, `SITEMAP`
+- `src/lib/types.ts` — hand-written result types
+- `src/app/[[...slug]]/page.tsx` — the one route, with `generateStaticParams` and
+  `generateMetadata`
+- `src/components/sections.tsx` — the section registry (empty until Phase 10)
+- `src/components/page-content.tsx`, `post-view.tsx` — interim templates
+- `src/app/api/revalidate/route.ts` — webhook + `GET` health check
+- `src/app/api/preview/route.ts`, `preview/exit/route.ts` — draft mode, with open-redirect guard
+- `src/app/sitemap.ts`, `robots.ts`, `not-found.tsx`, `layout.tsx`, `globals.css`
+- `next.config.ts` — image remote patterns derived from the env var, capped qualities, security
+  headers, `redirects.json` passthrough
+
+*Docs:* `SYSTEM.md`, `CLAUDE.md`, `.gitignore`, and this file.
+
+**Verified.** `pnpm build` passes with zero type errors. Routes emitted: `/[[...slug]]` (SSG),
+three API routes (dynamic), `/robots.txt`, `/sitemap.xml`, `/_not-found` (static). The two
+warnings during build are the *designed* fallback: `cms.dripbar.site` does not resolve yet, and
+the try/catch in `generateStaticParams` and `sitemap.ts` degrades gracefully instead of failing
+the build. `pnpm lint` clean. Secrets confirmed absent from git.
+
+**Decisions and reasoning.**
+
+| Decision | Why |
+|---|---|
+| Client-first, kit-shaped (revises the playbook) | See §2 |
+| Phase-1 queries use core WordPress fields only — no ACF, no Yoast | Proves the whole pipeline end-to-end before either paid plugin is bought. ACF fragments layer in at Phase 09, Yoast SEO fields at Phase 12. |
+| Plain `fetch`, no GraphQL client library | Needs precise control over Next cache tags; every abstraction makes that harder to reason about. Zero runtime dependencies. |
+| Menu locations registered in the mu-plugin, not a theme | Block theme registers none; also survives theme switches and travels to the next client. |
+| Forms will bypass WordPress entirely (Next route handler + Resend) | No PHP mail deliverability problems, no plugin, no spam surface. |
+| Sitemap/robots generated in Next.js | Yoast emits `cms.` URLs — would split search authority. |
+| `revalidateTag(tag, "max")` two-arg form | Verified against installed Next 16.3.1 types. See §5. |
+| `eslint` key removed from `next.config.ts` | Next 16 dropped it. See §5. |
+| Image `qualities: [70, 85]`, trimmed `deviceSizes` | Each extra quality/size multiplies the optimised variants Vercel bills for. No visible quality difference. |
+| Visitor redirect gated behind `HEADLESS_LIVE`, off by default | The loop in §5 cannot be auto-detected. |
+| Interim templates render Gutenberg HTML via `@tailwindcss/typography` | Lets content flow end-to-end before the ACF builder exists. |
+| 302 not 301 for the visitor redirect until launch | A mistake cannot get permanently cached in browsers or ISP proxies. Switch to 301 at Phase 16. |
+
+**Corrected mid-session.** Initially told the user `wp-config.php` was in `public_html`. A cPanel
+screenshot showed the real document root is `/home/myaimgenius/dripbar.site`. All paths updated
+in `SYSTEM.md` §1.
+
+**Design questions answered** (worth preserving — this reasoning shapes Phase 09/10):
+
+*Can a few repeatable blocks produce creative, modern designs?* Yes, because **blocks are content
+contracts, not designs.** A `hero` block is a data shape (heading + sub + image + CTAs); what it
+looks like lives entirely in the React component. Variety comes from three axes: brand tokens;
+component implementation; and a **`variant` select field on every layout** so one ACF layout maps
+to 3–4 genuinely different designs. 12 layouts × 3 variants = 36 section designs.
+
+Headless actually raises the design ceiling versus Elementor — you own the whole DOM and
+stylesheet, so real type scales, container queries, and `:has()` become available, where
+Elementor fights you with nested divs and inline styles.
+
+*What is genuinely lost:* per-page bespoke art direction. In Elementor you can invent a unique
+asymmetric About-page layout that afternoon. Here that is a new component, 30–60 minutes. Accept
+the cost when a signature moment is worth it.
+
+**→ Action for Phase 09: add a `variant` field to every ACF layout when the model is designed.**
+Nearly free then, expensive to retrofit once names are frozen (see §6.2).
+
+*Can an AI design the pages?* Split answer. **Execution — strong:** implementing a direction
+consistently across 12 components, Tailwind craft, responsive behaviour, accessibility, motion.
+**Originating art direction — weak:** from a blank prompt it converges on recognisable defaults
+(cream + serif + terracotta; near-black + acid green; purple-blue gradient hero; Inter
+everywhere; rounded cards with accent rails; emoji section markers). So the user must supply
+references or a written direction — that is the highest-leverage ten minutes in the project.
+
+Workflow that works: user supplies references → AI produces a **design plan first** (palette as
+named hexes, type pairing, layout concept) *before any code* → build one section per turn with
+review → final coherence pass across all sections.
+
+**Business risk flagged.** If only tokens change between clients, the sites will look
+recognisably identical — same layouts, same rhythm, different colours. Clients in the same city
+Google each other. Per client, genuinely restyle components, do not just retint them. That is
+the 3–4 hour design pass in the runbook; it is not optional.
+
+**Commits.**
+
+| SHA | What |
+|---|---|
+| `bd68cb5` | feat: headless WordPress foundation for project 01 |
+| `ec74c26` | docs: update SYSTEM.md tracker after foundation phases |
+| `26a6279` | fix(wp): redirect loop guard and allowed_redirect_hosts filter |
+| `a599656` | fix(wp): gate visitor redirect behind explicit HEADLESS_LIVE switch |
+| `cd693ac` | docs: record verified cPanel paths and subdomain decision |
+
+**Ended blocked on the user.** Creating the `cms.dripbar.site` subdomain in cPanel — Domains →
+Create A New Domain → `cms.dripbar.site` → tick *Share document root
+(`/home/myaimgenius/dripbar.site`) with "dripbar.site"* → then AutoSSL.
+
+**Immediate next action when the session resumes.** Ask what
+`https://cms.dripbar.site/wp-admin` shows:
+- Login screen with existing account working → correct, proceed to paste the wp-config block and
+  upload the mu-plugin, then install WPGraphQL.
+- WordPress *installer* asking for DB details → wrong document root, fix before anything else.
+- Certificate warning → AutoSSL unfinished, wait.
+
+Once `/graphql` responds: set `WP_GRAPHQL_URL`, run `pnpm dev`, and get a real page rendering
+end-to-end. That milestone unblocks everything downstream.
+
+---
+
+## 8. Open blockers as of the last session
+
+Full live status in `SYSTEM.md` §6. Summary of what they mean:
+
+| ID | Blocker | Why it matters |
+|---|---|---|
+| **B-01** | **ACF Pro licence** — has the user got one? | Flexible Content and Repeater are Pro-only. Without them there is no page builder and no section library — **the architecture does not work.** ~$249/yr unlimited sites. If the answer is no, the fallback is hand-rolled meta boxes in the bridge plugin: free, more work, and the decision must be made *before* Phase 09. |
+| **B-02** | **Brand brief** — client name, logo, colours, fonts, tone, 2 reference sites, service list, service areas, phone, address | Blocks all design work (Phase 10). Reference sites matter most — see the design-question answer in §7. |
+| **B-03** | Is `dripbar.site` the final domain, or will the client bring their own? | Either is fine; only changes when DNS cuts over. CMS can stay on `cms.dripbar.site` permanently. |
+| **B-04** | SSH / Terminal in the host panel? | Not required, but without it every plugin install is a manual zip upload and `setup.sh` (Phase 17) cannot run. |
+| **B-05** | **WordPress 7.1 plugin compatibility is unverified** | Could not confirm WPGraphQL / WPGraphQL-for-ACF support WP 7.1. Check "Tested up to" on each plugin page before relying on them. If WPGraphQL does not support 7.1, that is a project-level problem, not a detail. |
+| **B-06** | Resend sending domain | Needs DKIM/SPF DNS records before the contact form can send. |
+
+---
+
+## 9. Template for the next session entry
+
+Copy this to the top of §7 and fill it in.
+
+```markdown
+### Session NN — YYYY-MM-DD
+
+**Asked.** <what the user wanted>
+
+**Built / changed.** <file paths and what each does>
+
+**Verified.** <commands run and their actual result — never claim a pass without running it>
+
+**Decisions and reasoning.**
+| Decision | Why |
+|---|---|
+| | |
+
+**Discovered / corrected.** <anything that contradicts an earlier assumption in this file>
+
+**Commits.** <sha — message>
+
+**Blocked on.** <who, what>
+
+**Immediate next action.** <the single concrete thing to do first next time>
+```
