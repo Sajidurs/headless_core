@@ -17,6 +17,11 @@
 | **Public site** | `https://dripbar.site` → Vercel |
 | **WordPress** | `https://cms.dripbar.site` → LiteSpeed shared host `103.159.36.86` |
 | **GraphQL** | `https://cms.dripbar.site/graphql` |
+| **cPanel user** | `myaimgenius` |
+| **Document root** | `/home/myaimgenius/dripbar.site` — **not** `public_html` (verified from cPanel 2026-08-20) |
+| **wp-config.php** | `/home/myaimgenius/dripbar.site/wp-config.php` |
+| **mu-plugins** | `/home/myaimgenius/dripbar.site/wp-content/mu-plugins/` |
+| **ACF JSON** | `/home/myaimgenius/dripbar.site/wp-content/mu-plugins/acf-json/` |
 | **Repo** | `web/` = frontend · `wp/` = backend files under version control |
 
 ### Environment as found (verified 2026-08-20)
@@ -198,6 +203,8 @@ Nothing ships until every line is ✅.
 | 2026-08-20 | `revalidateTag(tag, "max")` — two arguments | **Verified against installed Next 16.3.1 types.** Next 16 made the cacheLife profile argument required; the one-argument Next 15 form does not compile. Most tutorials online still show the old form. |
 | 2026-08-20 | `eslint` key removed from `next.config.ts` | Next 16 dropped it — linting is no longer part of `next build`. Run `pnpm lint` separately. |
 | 2026-08-20 | Image `qualities` capped at `[70, 85]`, device sizes trimmed | Each extra quality/size multiplies the optimised variants Vercel bills for. Controls playbook blocker B-07 with no visible quality difference. |
+| 2026-08-20 | Visitor redirect gated behind an explicit `HEADLESS_LIVE` constant, off by default | Hostname detection could not prevent the loop that forms with WordPress's own `redirect_canonical` before DNS cutover — each hop looks legitimate in isolation, and PHP cannot tell where a domain currently resolves. Flip it on at Phase 14. |
+| 2026-08-20 | `cms.dripbar.site` shares the document root of `dripbar.site` | One WordPress install, one database, two hostnames. A second install would split content from the frontend reading it. |
 
 ---
 
