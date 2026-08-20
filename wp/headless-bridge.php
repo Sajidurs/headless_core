@@ -33,20 +33,36 @@ function hb_frontend_host() {
 }
 
 /**
- * Has DNS been cut over to Vercel yet?
+ * Should stray visitors be bounced to the Next.js site?
  *
- * Until it has, dripbar.site still resolves to this same WordPress install.
- * That matters a lot for the redirect in section 1: sending a visitor from
- * dripbar.site to HEADLESS_URL would land them back here, and loop forever.
+ * Only once Vercel actually owns the public domain. Before that, the redirect
+ * creates an infinite loop, and the loop is not obvious:
  *
- * So: if the request arrived on the public hostname, DNS has NOT cut over and
- * we must not redirect. Once Vercel owns the apex, requests only ever arrive
- * here on cms.dripbar.site and the redirect becomes safe automatically.
+ *   visitor -> cms.dripbar.site/about
+ *           -> this plugin redirects to dripbar.site/about
+ *           -> but dripbar.site still resolves to THIS server, so WP serves it
+ *           -> WP's own redirect_canonical sees WP_HOME is cms.dripbar.site
+ *              and 301s back to cms.dripbar.site/about
+ *           -> round and round
  *
- * This is what makes the plugin safe to upload at any point in the process
- * rather than only after the DNS change.
+ * Checking the incoming hostname does not catch that, because each individual
+ * hop looks legitimate. PHP also cannot reliably detect where a domain's DNS
+ * currently points. So this is an explicit switch rather than a guess.
+ *
+ * HOW TO USE IT
+ *   During the build:  leave HEADLESS_LIVE undefined or false.
+ *                      dripbar.site and cms.dripbar.site both serve WordPress.
+ *                      Harmless — nobody is visiting the site yet.
+ *   At DNS cutover:    add  define( 'HEADLESS_LIVE', true );  to wp-config.php
+ *                      (Phase 14). From then on cms.* bounces visitors to Vercel.
  */
-function hb_dns_has_cut_over() {
+function hb_should_redirect_visitors() {
+	if ( ! defined( 'HEADLESS_LIVE' ) || ! HEADLESS_LIVE ) {
+		return false;
+	}
+
+	// Belt and braces. Even when live, never redirect a request that somehow
+	// arrived on the public hostname — that is the loop condition.
 	$incoming = isset( $_SERVER['HTTP_HOST'] ) ? strtolower( $_SERVER['HTTP_HOST'] ) : '';
 
 	return $incoming !== strtolower( (string) hb_frontend_host() );
@@ -98,16 +114,16 @@ add_action( 'template_redirect', function () {
 		return;
 	}
 
-	// Loop guard. Before DNS cuts over to Vercel, the public hostname still
-	// points here — redirecting would send the visitor straight back.
-	if ( ! hb_dns_has_cut_over() ) {
+	// Off until HEADLESS_LIVE is defined at DNS cutover. See the function above
+	// for why this cannot be auto-detected.
+	if ( ! hb_should_redirect_visitors() ) {
 		return;
 	}
 
 	$path = isset( $_SERVER['REQUEST_URI'] ) ? $_SERVER['REQUEST_URI'] : '/';
 
-	// 302 while building, so nothing gets permanently cached in a visitor's
-	// browser or an ISP proxy. Switch to 301 at launch (Phase 16).
+	// 302 until launch is verified, so a mistake cannot get permanently cached
+	// in visitors' browsers or an ISP proxy. Switch to 301 at Phase 16.
 	wp_safe_redirect( HEADLESS_URL . $path, 302 );
 	exit;
 } );
