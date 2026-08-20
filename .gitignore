@@ -1,0 +1,37 @@
+# --- Secrets ------------------------------------------------------------------
+# wp-config-snippet.php holds the real PREVIEW_SECRET and REVALIDATE_SECRET.
+wp/wp-config-snippet.php
+.secrets.tmp
+*.env
+.env
+.env.local
+.env*.local
+
+# --- Plugin zips --------------------------------------------------------------
+# ACF Pro and WPGraphQL-for-ACF are licensed. Keep them locally, out of git.
+wp/zips/
+
+# --- Node ---------------------------------------------------------------------
+node_modules/
+.pnpm-store/
+
+# --- Next ---------------------------------------------------------------------
+web/.next/
+web/out/
+web/build/
+next-env.d.ts
+
+# --- Vercel -------------------------------------------------------------------
+.vercel
+
+# --- OS / editor --------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+*.swp
+
+# --- Logs ---------------------------------------------------------------------
+*.log
+npm-debug.log*
+pnpm-debug.log*
