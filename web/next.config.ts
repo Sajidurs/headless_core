@@ -5,10 +5,21 @@ import redirects from "./redirects.json";
 /**
  * The CMS hostname is derived from the GraphQL URL rather than hardcoded, so a
  * new client only ever needs the env var changed — never this file.
+ *
+ * No fallback domain on purpose. A wrong hostname here would silently disable
+ * image optimisation for every upload, so failing the build with a clear
+ * message is better. See src/lib/env.ts for the same reasoning applied to the
+ * public site URL.
  */
-const cmsHost = new URL(
-  process.env.WP_GRAPHQL_URL ?? "https://cms.dripbar.site/graphql",
-).hostname;
+if (!process.env.WP_GRAPHQL_URL) {
+  throw new Error(
+    "Missing required environment variable WP_GRAPHQL_URL.\n" +
+      "Local: copy web/.env.local.example to web/.env.local and fill it in.\n" +
+      "Deployed: set it in Vercel -> Project Settings -> Environment Variables.",
+  );
+}
+
+const cmsHost = new URL(process.env.WP_GRAPHQL_URL).hostname;
 
 const config: NextConfig = {
   images: {

@@ -22,7 +22,13 @@ in `changeslog.md` only.
 | `wp/acf-json/` | The content model as files. **This is the reusable asset.** Never edit by hand; ACF writes it. |
 | `SYSTEM.md` | Phase tracker, blockers, decisions. |
 
-Backend is `cms.dripbar.site` (WordPress 7.1, PHP 8.1, LiteSpeed). Public site is `dripbar.site` on Vercel.
+Backend is `cms.jahidpro.com` (WordPress 7.1, PHP 8.1, nginx). Public site is `jahidpro.com` on Vercel.
+
+Client domains appear in **no committed file**. They live only in `web/.env.local` and
+`wp/wp-config-snippet.php`, both gitignored. Committed code reads env vars via
+`src/lib/env.ts`, which throws on a missing value rather than falling back to a default —
+a stale fallback would publish canonicals and a sitemap pointing at another client's site.
+Comments and examples use `example.com`.
 Data travels one way only: WordPress → WPGraphQL → Next.js Server Components → static HTML.
 
 ## Stack facts that change how you write code

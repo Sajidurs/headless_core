@@ -2,19 +2,19 @@ import type { MetadataRoute } from "next";
 
 import { wpQuery } from "@/lib/wp";
 import { SITEMAP } from "@/lib/queries";
+import { siteUrl } from "@/lib/env";
 import type { SitemapResult } from "@/lib/types";
 
 /**
  * The sitemap is generated here, not by Yoast.
  *
  * Yoast still runs on the WordPress side and still writes page metadata, but
- * its sitemap lists cms.dripbar.site URLs. Submitting that to Google would
- * index the backend and split the client's search authority across two
- * hostnames. So we build the sitemap from the same GraphQL data, with the
- * public hostname.
+ * its sitemap lists cms.<domain> URLs. Submitting that to Google would index
+ * the backend and split the client's search authority across two hostnames. So
+ * we build the sitemap from the same GraphQL data, with the public hostname.
  */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const base = (process.env.NEXT_PUBLIC_SITE_URL ?? "https://dripbar.site").replace(/\/$/, "");
+  const base = siteUrl();
 
   try {
     const data = await wpQuery<SitemapResult>(SITEMAP, {}, { tags: ["wp"] });

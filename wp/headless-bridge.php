@@ -26,7 +26,7 @@ if ( ! defined( 'HEADLESS_URL' ) ) {
 }
 
 /**
- * The public site's hostname, e.g. "dripbar.site".
+ * The public site's hostname, e.g. "example.com".
  */
 function hb_frontend_host() {
 	return wp_parse_url( HEADLESS_URL, PHP_URL_HOST );
@@ -38,11 +38,11 @@ function hb_frontend_host() {
  * Only once Vercel actually owns the public domain. Before that, the redirect
  * creates an infinite loop, and the loop is not obvious:
  *
- *   visitor -> cms.dripbar.site/about
- *           -> this plugin redirects to dripbar.site/about
- *           -> but dripbar.site still resolves to THIS server, so WP serves it
- *           -> WP's own redirect_canonical sees WP_HOME is cms.dripbar.site
- *              and 301s back to cms.dripbar.site/about
+ *   visitor -> cms.example.com/about
+ *           -> this plugin redirects to example.com/about
+ *           -> but example.com still resolves to THIS server, so WP serves it
+ *           -> WP's own redirect_canonical sees WP_HOME is cms.example.com
+ *              and 301s back to cms.example.com/about
  *           -> round and round
  *
  * Checking the incoming hostname does not catch that, because each individual
@@ -51,7 +51,7 @@ function hb_frontend_host() {
  *
  * HOW TO USE IT
  *   During the build:  leave HEADLESS_LIVE undefined or false.
- *                      dripbar.site and cms.dripbar.site both serve WordPress.
+ *                      example.com and cms.example.com both serve WordPress.
  *                      Harmless — nobody is visiting the site yet.
  *   At DNS cutover:    add  define( 'HEADLESS_LIVE', true );  to wp-config.php
  *                      (Phase 14). From then on cms.* bounces visitors to Vercel.
@@ -86,7 +86,7 @@ add_filter( 'allowed_redirect_hosts', function ( $hosts ) {
  * 1. NOBODY SHOULD LAND ON THE WORDPRESS FRONTEND
  *
  * Old links, Google's index, and the client typing the wrong URL all end up at
- * cms.dripbar.site. Send them to the real site at the matching path.
+ * cms.example.com. Send them to the real site at the matching path.
  *
  * The three early returns matter:
  *   - REST/GraphQL requests must pass through, or the frontend gets a redirect
@@ -262,7 +262,7 @@ add_action( 'after_setup_theme', function () {
 /* ===========================================================================
  * 6. KEEP THE CMS OUT OF GOOGLE
  *
- * If cms.dripbar.site gets indexed you are competing with your own client site
+ * If cms.example.com gets indexed you are competing with your own client site
  * and splitting its authority. Section 1 redirects human visitors, but crawlers
  * hitting /graphql or an asset URL never reach that hook — so send the header
  * unconditionally.

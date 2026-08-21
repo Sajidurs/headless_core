@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
  * GET is a health check, so you can confirm the route is deployed and the
  * secret matches without having to save a post in WordPress.
  *
- *   curl -H "x-wp-secret: <secret>" https://dripbar.site/api/revalidate
+ *   curl -H "x-wp-secret: <secret>" https://example.com/api/revalidate
  */
 export async function GET(req: NextRequest) {
   const authorised = req.headers.get("x-wp-secret") === process.env.REVALIDATE_SECRET;

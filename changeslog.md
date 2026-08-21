@@ -146,10 +146,10 @@ HTML. This is why the site can be fully pre-rendered and still update in seconds
 ### Data flow, one direction only
 
 ```
-WordPress (cms.dripbar.site)
+WordPress (cms.example.com)
   → WPGraphQL /graphql
     → wpQuery() in Server Components   [never in a Client Component]
-      → static HTML on Vercel CDN (dripbar.site)
+      → static HTML on Vercel CDN (example.com)
 
 WordPress save → /api/revalidate → revalidateTag() → page rebuilds
 WordPress Preview button → /api/preview → draft mode cookie → authenticated uncached fetch
@@ -157,32 +157,32 @@ WordPress Preview button → /api/preview → draft mode cookie → authenticate
 
 ---
 
-## 4. Environment — verified, not assumed
+## 4. Environment
 
-Inspected live on 2026-08-20. Do not trust older assumptions in the playbook.
+**Current, verified values live in `SYSTEM.md` §1** — domains, host, IP, paths, and what is
+installed. They are deliberately not duplicated here, because they change: the project already
+moved hosts and domains once (see Session 03).
 
-| Item | Value |
-|---|---|
-| WordPress | **7.1**, fresh install, site title still "My Blog" |
-| PHP | 8.1.34 — should be bumped to 8.2/8.3 if the host offers it |
-| Web server | LiteSpeed, cPanel-based shared host, IP `103.159.36.86` |
-| Theme | twentytwentyfive (block theme — this matters, see §6) |
-| Front page | set to *Posts*; needs changing to a static page |
-| Application Passwords | available ✅ (required for draft preview) |
-| cPanel user | `myaimgenius` |
-| **Document root** | **`/home/myaimgenius/dripbar.site`** — NOT `public_html` |
-| `wp-config.php` | `/home/myaimgenius/dripbar.site/wp-config.php` |
-| mu-plugins | `/home/myaimgenius/dripbar.site/wp-content/mu-plugins/` |
-| Cloudflare | account exists, not yet in front of the domain |
-| `/graphql` | 404 — WPGraphQL not installed yet |
-| `cms.dripbar.site` | did not exist as of end of Session 01 |
+What is stable and worth stating as *principle* rather than fact:
 
-**Domain plan.** `dripbar.site` → Vercel (public site). `cms.dripbar.site` → WordPress, sharing
-the **same document root** as `dripbar.site`. One install, one database, two hostnames. A second
-WordPress install would split content from the frontend reading it.
+**Domain plan.** The apex domain → Vercel (the public site). A `cms.` subdomain → WordPress,
+**sharing the same document root** as the apex. One install, one database, two hostnames. A
+second WordPress install would split content from the frontend reading it.
 
-**User's existing accounts:** Vercel, GitHub (fresh repo), Resend, Cloudflare. All unconfigured
-for this project so far.
+**Where client-specific values are allowed to exist** — this is a hard rule, and it is why the
+domain migration in Session 03 touched no committed source:
+
+| Value | Lives in | Committed? |
+|---|---|---|
+| Public site URL, GraphQL URL | `web/.env.local` + Vercel env vars | ❌ gitignored |
+| WP URLs, shared secrets | `wp/wp-config-snippet.php` | ❌ gitignored |
+| Brand colours, fonts | `web/src/app/globals.css` `@theme` | ✅ |
+| Logo, phone, address, socials | ACF Options page in wp-admin | n/a |
+
+Committed code reads env vars through `web/src/lib/env.ts`, which **throws on a missing value
+rather than falling back to a default**. Reasoning in §5. Comments and examples use `example.com`.
+
+**User's accounts:** Vercel, GitHub, Resend, Cloudflare.
 
 ---
 
@@ -222,11 +222,11 @@ host via the `allowed_redirect_hosts` filter in the bridge plugin.
 This one is subtle and cost real thought. Before DNS cutover:
 
 ```
-visitor → cms.dripbar.site/about
-        → bridge plugin redirects to dripbar.site/about
-        → dripbar.site still resolves to this same server, so WordPress serves it
-        → WordPress's own redirect_canonical sees WP_HOME is cms.dripbar.site
-        → 301 back to cms.dripbar.site/about
+visitor → cms.example.com/about
+        → bridge plugin redirects to example.com/about
+        → example.com still resolves to this same server, so WordPress serves it
+        → WordPress's own redirect_canonical sees WP_HOME is cms.example.com
+        → 301 back to cms.example.com/about
         → infinite loop
 ```
 
@@ -239,7 +239,7 @@ points. So the redirect is gated behind an **explicit constant**, off by default
 // define( 'HEADLESS_LIVE', true );
 ```
 
-**Consequence during the build:** both `dripbar.site` and `cms.dripbar.site` serve WordPress,
+**Consequence during the build:** both `example.com` and `cms.example.com` serve WordPress,
 and the apex 301s to the CMS subdomain. This looks odd but is harmless — nobody is visiting yet.
 
 ---
@@ -288,6 +288,95 @@ A checklist of traps specific to this stack. Most cost an afternoon each.
 ## 7. Session log
 
 *Newest first. Each entry is self-contained.*
+
+### Session 03 — 2026-08-21 · domain and host migration
+
+**Asked.** The project has moved: `dripbar.site` is abandoned, `jahidpro.com` is the new domain
+with a fresh WordPress install, and `cms.jahidpro.com` is already created with SSL. Swap the old
+domain for the new one.
+
+**Verified about the new environment before changing anything.**
+- `jahidpro.com` and `cms.jahidpro.com` both resolve to `141.95.34.163` and return **identical**
+  responses, with the REST `Link` header on both pointing at the same install. So the subdomain
+  correctly **shares the apex document root** — one install, two hostnames. No second install.
+- SSL on `cms.` is valid (`ssl_verify_result=0`); `/wp-admin/` 302s to login as expected.
+- **This is a different server.** Old host was LiteSpeed at `103.159.36.86` (cPanel user
+  `myaimgenius`); the new one is **nginx** at `141.95.34.163` (OVH range). PHP is 8.1.34 on both.
+  **Every filesystem path recorded in Session 01 is now void** — see B-08.
+- WordPress 7.1, fresh, "My Blog", front page still set to Posts. `home`/`siteurl` still the apex.
+- `/graphql` still 404 — WPGraphQL not installed on this host either.
+
+**The finding that changed the shape of the work.** Every occurrence of the old domain in
+`web/src/` was a **hardcoded fallback** — `process.env.NEXT_PUBLIC_SITE_URL ?? "https://dripbar.site"`
+— in four files, plus comment examples in `wp/headless-bridge.php` and `revalidate/route.ts`.
+
+Swapping one client's domain for another in committed source would have left the same trap for
+the next client. So the fix was to establish the rule instead:
+
+> **No committed file names a client domain.** Real values live only in `web/.env.local` and
+> `wp/wp-config-snippet.php` (both gitignored) plus Vercel env vars. Comments use `example.com`.
+
+**Built / changed.**
+- **`web/src/lib/env.ts`** *(new)* — `siteUrl()` and `graphqlUrl()`, which **throw** on a missing
+  value rather than defaulting. Documents why a literal `process.env.NEXT_PUBLIC_*` access is
+  required (dynamic lookups are not inlined at build time and come back undefined in client
+  components).
+- `web/next.config.ts` — fallback removed, explicit throw with a fix-it message.
+- `web/src/app/robots.ts`, `sitemap.ts`, `layout.tsx` — now call `siteUrl()`.
+- `wp/headless-bridge.php` (9 refs), `web/src/app/api/revalidate/route.ts` (1 ref) — comment
+  examples genericised to `example.com`. These are kit files; they should never need per-client
+  edits again.
+- `web/.env.local`, `wp/wp-config-snippet.php` — real `jahidpro.com` values. Gitignored.
+- `CLAUDE.md` — new domain, corrected server (nginx not LiteSpeed), and the no-domains-in-source
+  rule.
+- `SYSTEM.md` — §1 rewritten with the new host and a migration note; §4 Phase 02 marked ✅
+  (subdomain exists); new **B-08**; B-03 rewritten; launch checklist domains updated.
+- `changeslog.md` — §4 replaced with a pointer to `SYSTEM.md` §1 plus the where-client-values-live
+  table (it was duplicating live state); §3 and §5 examples genericised. **§7 history left
+  untouched** — it correctly records that the project was on `dripbar.site`.
+
+**Verified.**
+- `rm -rf .next && pnpm build` → passes, 7 routes emitted. The two GraphQL warnings are the
+  designed graceful degradation: `/graphql` is 404, and the try/catch in `generateStaticParams`
+  and `sitemap.ts` degrades instead of failing the build.
+- `pnpm lint` clean.
+- Build output contains `jahidpro.com` and **zero** occurrences of the old domain.
+- **Negative test:** `WP_GRAPHQL_URL="" npx next build` → exits 1 with
+  `Error: Missing required environment variable WP_GRAPHQL_URL`. The guard works.
+
+**Decisions and reasoning.**
+
+| Decision | Why |
+|---|---|
+| Remove hardcoded domain fallbacks entirely rather than updating them | These values become canonical tags, OG URLs, and the sitemap. A stale fallback would silently publish canonicals and a sitemap pointing at *another client's domain* — an SEO failure nobody notices for weeks. A build that fails with a clear message is strictly better than one that succeeds wrongly. |
+| Genericise comments in kit files to `example.com` | `headless-bridge.php` is copied verbatim to every client. Naming one client in its comments guarantees stale docs on every other. |
+| Real domains only in the two gitignored config files | Makes the next migration a two-file edit instead of an eleven-file search-and-replace. Already proved: B-03 downgraded from a real risk to a triviality. |
+| Replace `changeslog.md` §4 with a pointer to `SYSTEM.md` §1 | It held live environment facts, which is `SYSTEM.md`'s job. Keeping both is exactly the drift the §0 boundary exists to prevent — and this migration is what exposed it. |
+| Leave §7 session history naming the old domain | It is a record of what happened, not a statement about the present. Rewriting it would destroy the audit trail. |
+
+**Discovered / corrected.**
+- `CLAUDE.md` said the backend runs LiteSpeed. True of the old host, wrong now — corrected to
+  nginx.
+- Session 01's document-root discovery (`/home/myaimgenius/dripbar.site`) is now worthless. The
+  new host's panel type is unknown, so the path has to be re-found. Tracked as **B-08**, and it
+  blocks Phases 03 and 05 — i.e. everything on the WordPress side.
+- The `changeslog.md` §4 / `SYSTEM.md` §1 duplication existed since Session 01 and only surfaced
+  because the facts changed. Worth remembering: duplicated state looks harmless until it is wrong.
+
+**Commits.**
+
+| SHA | What |
+|---|---|
+| `61ac429` | docs: correct the self-reference guidance in the log protocol *(from Session 02)* |
+
+**Blocked on.** **B-08** — the document root on the new host. Nothing on the WordPress side can
+proceed without it. Then **B-01** (ACF Pro licence).
+
+**Immediate next action.** Get the document root: the panel's file manager, showing the folder
+that contains `wp-config.php`, or `pwd` over SSH. Then paste the wp-config block, upload
+`headless-bridge.php` to `wp-content/mu-plugins/`, and install WPGraphQL so `/graphql` responds.
+
+---
 
 ### Session 02 — 2026-08-20 · repo published
 
@@ -490,10 +579,12 @@ Full live status in `SYSTEM.md` §6. Summary of what they mean:
 |---|---|---|
 | **B-01** | **ACF Pro licence** — has the user got one? | Flexible Content and Repeater are Pro-only. Without them there is no page builder and no section library — **the architecture does not work.** ~$249/yr unlimited sites. If the answer is no, the fallback is hand-rolled meta boxes in the bridge plugin: free, more work, and the decision must be made *before* Phase 09. |
 | **B-02** | **Brand brief** — client name, logo, colours, fonts, tone, 2 reference sites, service list, service areas, phone, address | Blocks all design work (Phase 10). Reference sites matter most — see the design-question answer in §7. |
-| **B-03** | Is `dripbar.site` the final domain, or will the client bring their own? | Either is fine; only changes when DNS cuts over. CMS can stay on `cms.dripbar.site` permanently. |
+| **B-03** | Is the current domain the final one, or will the client bring their own? | Cheap either way now — proved in Session 03. Domains live only in `web/.env.local`, `wp/wp-config-snippet.php`, and Vercel env vars; no committed file names a client domain. |
 | **B-04** | SSH / Terminal in the host panel? | Not required, but without it every plugin install is a manual zip upload and `setup.sh` (Phase 17) cannot run. |
 | **B-05** | **WordPress 7.1 plugin compatibility is unverified** | Could not confirm WPGraphQL / WPGraphQL-for-ACF support WP 7.1. Check "Tested up to" on each plugin page before relying on them. If WPGraphQL does not support 7.1, that is a project-level problem, not a detail. |
 | **B-06** | Resend sending domain | Needs DKIM/SPF DNS records before the contact form can send. |
+| **B-07** | Repo visibility unconfirmed | Nothing leaked — history was audited before the first push. But the repo will hold the commercial kit and client content models. Set it private. |
+| **B-08** | **Document root unknown on the new host** | The old cPanel path is void after the Session 03 host move. Needed to place the wp-config edit, the mu-plugin, and later `acf-json/`. Blocks Phases 03 and 05 — i.e. everything. |
 
 ---
 

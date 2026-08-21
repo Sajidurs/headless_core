@@ -17,29 +17,31 @@
 | **Doubles as** | The reusable kit. See §3 Strategy. |
 | **Started** | 2026-08-20 |
 | **Target ship** | TBC |
-| **Public site** | `https://dripbar.site` → Vercel |
-| **WordPress** | `https://cms.dripbar.site` → LiteSpeed shared host `103.159.36.86` |
-| **GraphQL** | `https://cms.dripbar.site/graphql` |
-| **Repo** | `https://github.com/Sajidurs/headless_core` · branch `main` · pushed 2026-08-20 |
-| **cPanel user** | `myaimgenius` |
-| **Document root** | `/home/myaimgenius/dripbar.site` — **not** `public_html` (verified from cPanel 2026-08-20) |
-| **wp-config.php** | `/home/myaimgenius/dripbar.site/wp-config.php` |
-| **mu-plugins** | `/home/myaimgenius/dripbar.site/wp-content/mu-plugins/` |
-| **ACF JSON** | `/home/myaimgenius/dripbar.site/wp-content/mu-plugins/acf-json/` |
-| **Repo** | `web/` = frontend · `wp/` = backend files under version control |
+| **Public site** | `https://jahidpro.com` → Vercel |
+| **WordPress** | `https://cms.jahidpro.com` → nginx, `141.95.34.163` |
+| **GraphQL** | `https://cms.jahidpro.com/graphql` |
+| **Repo** | `https://github.com/Sajidurs/headless_core` · branch `main` |
+| **Code layout** | `web/` = frontend · `wp/` = backend files under version control |
+| **Document root** | ❓ unknown on this host — see **B-08** |
 
-### Environment as found (verified 2026-08-20)
+> **Domain changed 2026-08-21.** The project moved off `dripbar.site` to `jahidpro.com`, and onto
+> a different server (was LiteSpeed `103.159.36.86`, cPanel user `myaimgenius`). All old paths are
+> void. History in `changeslog.md` still refers to the old domain — that is correct, it is a record
+> of what happened.
+
+### Environment as found (verified 2026-08-21)
 
 | Thing | State |
 |---|---|
 | WordPress | 7.1, fresh install, site title still "My Blog" |
 | PHP | 8.1.34 — **bump to 8.2 or 8.3 in the host panel if offered** |
-| Server | LiteSpeed |
+| Server | nginx (was LiteSpeed on the old host) |
 | Theme | twentytwentyfive (stays, never renders publicly) |
 | Front page | Set to *Posts* — must change to a static page |
-| Application Passwords | Available ✅ (needed for draft preview) |
-| `cms.` subdomain | Does not exist yet |
+| `cms.jahidpro.com` | ✅ exists, SSL valid, **shares the apex document root** — confirmed: both hostnames return the same install |
+| WP `home` / `siteurl` | Still `https://jahidpro.com` — the wp-config block will pin them to `cms.` |
 | `/graphql` | 404 — WPGraphQL not installed yet |
+| Application Passwords | Assumed available (was on the old host; re-verify) |
 | Cloudflare | Not in front of the domain yet |
 
 ---
@@ -79,7 +81,7 @@ Kit extraction is **Phase 17**: mark the repo as a GitHub template, freeze ACF f
 |---|---|---|---|---|
 | 00 | Recon — verify install state | Claude | ✅ | See §1 |
 | 01 | Repo + folder structure + `CLAUDE.md` | Claude | ✅ | Pushed to GitHub `main`, 7 commits, 39 files. History audited for secrets — clean. |
-| 02 | Move WP to `cms.` subdomain | **You** | ⏳ | Host panel + DNS. **Do before any content.** |
+| 02 | Move WP to `cms.` subdomain | **You** | ✅ | `cms.jahidpro.com` live, SSL valid, shares the apex docroot — verified 2026-08-21 |
 | 03 | `wp-config.php` headless block | **You** | ⏳ | `wp/wp-config-snippet.php` ready to paste |
 | 04 | Install plugin set | **You** | 🚫 | Blocked on B-01 (ACF Pro licence) |
 | 05 | Upload bridge plugin | **You** | ⏳ | `wp/headless-bridge.php` ready to upload |
@@ -157,10 +159,11 @@ Page set for a cleaning service company. Adjust once the client brief lands.
 |---|---|---|---|---|---|
 | **B-01** | **ACF Pro licence.** Flexible Content and Repeater are Pro-only. Without them there is no page builder and no section library — the architecture does not work. ~$249/yr unlimited sites. | High | Phases 04, 09, 10 | **You** | 🚫 Open |
 | **B-02** | **No brand brief.** Need client name, logo, colours, fonts, tone, 2 reference sites, service list, service areas, phone, address. | High | Phase 10 | **You** | 🚫 Open |
-| **B-03** | **Is `dripbar.site` the final domain?** If the client brings their own, plan is unchanged — add their domain in Vercel and update `HEADLESS_URL`. CMS can stay on `cms.dripbar.site` permanently. | Low | Phase 14 | **You** | 🚫 Open |
+| **B-03** | **Is `jahidpro.com` the final domain?** Already changed once (from `dripbar.site`, 2026-08-21). Now cheap to change again: domains live only in `web/.env.local`, `wp/wp-config-snippet.php`, and Vercel. Nothing committed needs touching. | Low | Phase 14 | **You** | 🚫 Open |
 | **B-04** | **SSH / WP-CLI on the host?** Not required, but without it every plugin install is a manual zip upload and `setup.sh` cannot run. Check for "Terminal" or "SSH Access" in the host panel. | Medium | Phase 17 | **You** | 🚫 Open |
 | **B-05** | **WordPress 7.1 plugin compatibility unverified.** Cannot confirm from memory that WPGraphQL / WPGraphQL-for-ACF support WP 7.1. Check each plugin page for the "Tested up to" value before relying on it. | Medium | Phase 04 | **You** | 🚫 Open |
 | **B-06** | **Resend sending domain.** Contact form needs a verified domain in Resend, which means adding DKIM/SPF DNS records. | Low | Phase 13 | **You** | 🚫 Open |
+| **B-08** | **Document root unknown on the new host.** The old cPanel path is void — new server is nginx at `141.95.34.163`, panel type unknown. Needed to place `wp-config.php` edits, `wp-content/mu-plugins/headless-bridge.php`, and later `acf-json/`. Find it in the panel's file manager (look for the folder containing `wp-config.php`), or run `pwd` over SSH. | Medium | Phases 03, 05 | **You** | 🚫 Open |
 | **B-07** | **Repo visibility unconfirmed.** No secrets leaked either way — history was audited before the first push. But `headless_core` will hold the commercial kit and, from Phase 09, client content models in `wp/acf-json/`. Set it private while that is still cheap: GitHub → Settings → Danger Zone → Change visibility. Also tick *Template repository* at Phase 17. | Low | Phase 17 | **You** | 🚫 Open |
 
 ---
@@ -172,8 +175,8 @@ Nothing ships until every line is ✅.
 - [ ] Every page reachable; no unmapped-section warnings in the build log
 - [ ] `pnpm build` passes with zero type errors
 - [ ] Lighthouse mobile — performance 95+, accessibility 100, SEO 100
-- [ ] `/sitemap.xml` lists `dripbar.site`, never `cms.dripbar.site`
-- [ ] `cms.dripbar.site` returns `X-Robots-Tag: noindex`
+- [ ] `/sitemap.xml` lists `jahidpro.com`, never `cms.jahidpro.com`
+- [ ] `cms.jahidpro.com` returns `X-Robots-Tag: noindex`
 - [ ] Visiting a `cms.` page as a logged-out user redirects to the public site
 - [ ] Edit a page → Update → live change visible within 10 seconds
 - [ ] Preview button opens draft content on the public domain

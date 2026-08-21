@@ -3,6 +3,8 @@ import { Archivo, Newsreader } from "next/font/google";
 import { draftMode } from "next/headers";
 import Link from "next/link";
 
+import { siteUrl } from "@/lib/env";
+
 import "./globals.css";
 
 /**
@@ -30,7 +32,7 @@ const body = Newsreader({
 export const metadata: Metadata = {
   // Makes every relative URL in generated metadata absolute — required for
   // Open Graph images to resolve correctly when shared.
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://dripbar.site"),
+  metadataBase: new URL(siteUrl()),
   title: {
     default: "Cleaning services",
     template: "%s",
